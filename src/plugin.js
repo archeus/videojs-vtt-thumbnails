@@ -43,7 +43,7 @@ const onPlayerReady = (player, options) => {
 const vttThumbnails = function (options) {
   this.ready(() => {
     onPlayerReady(this, videojs.mergeOptions(defaults, options))
-  })
+})
 }
 
 /**
@@ -74,9 +74,10 @@ class vttThumbnailsPlugin {
     return this;
   }
 
-  src(source){
+  src(source, sprite){
     this.resetPlugin();
     this.options.src = source;
+    this.options.sprite = sprite;
     this.initializeThumbnails();
   }
 
@@ -115,9 +116,9 @@ class vttThumbnailsPlugin {
     const url = this.getFullyQualifiedUrl(this.options.src, baseUrl)
     this.getVttFile(url)
       .then((data) => {
-        this.vttData = this.processVtt(data)
-        this.setupThumbnailElement()
-      })
+      this.vttData = this.processVtt(data)
+    this.setupThumbnailElement()
+  })
   }
 
   /**
@@ -145,13 +146,15 @@ class vttThumbnailsPlugin {
     return new Promise((resolve, reject) => {
       const req = new XMLHttpRequest()
       req.data = {
-        resolve: resolve
-      }
-      req.addEventListener('load', this.vttFileLoaded)
-      req.open('GET', url)
-      req.send()
-    })
+      resolve: resolve
+    }
+    req.addEventListener('load', this.vttFileLoaded)
+    req.open('GET', url)
+    req.send()
+  })
   }
+
+
 
   /**
    * Callback for loaded VTT file.
@@ -250,23 +253,23 @@ class vttThumbnailsPlugin {
     const processedVtts = []
     const vttDefinitions = data.split(/[\r\n][\r\n]/i)
     vttDefinitions.forEach((vttDef) => {
-      if (vttDef.match(/([0-9]{2}:)?([0-9]{2}:)?[0-9]{2}(.[0-9]{3})?( ?--> ?)([0-9]{2}:)?([0-9]{2}:)?[0-9]{2}(.[0-9]{3})?[\r\n]{1}.*/gi)) {
-        let vttDefSplit = vttDef.split(/[\r\n]/i)
-        let vttTiming = vttDefSplit[0]
-        let vttTimingSplit = vttTiming.split(/ ?--> ?/i)
-        let vttTimeStart = vttTimingSplit[0]
-        let vttTimeEnd = vttTimingSplit[1]
-        let vttImageDef = vttDefSplit[1]
-        let vttCssDef = this.getVttCss(vttImageDef)
+      if (vttDef.match(/([0-9]{2}:)?([0-9]{2}:)?[0-9]{2}(.[0-9]{3})?( ?--> ?)([0-9]{2}:)?([0-9]{2}:)?[0-9]{2}(.[0-9]{3})?[.\r\n]{1}.*/gi)) {
+      let vttDefSplit = vttDef.split(/[\r\n]/i)
+      let vttTiming = vttDefSplit[0]
+      let vttTimingSplit = vttTiming.split(/ ?--> ?/i)
+      let vttTimeStart = vttTimingSplit[0]
+      let vttTimeEnd = vttTimingSplit[1]
+      let vttImageDef = vttDefSplit[1]
+      let vttCssDef = this.getVttCss(vttImageDef)
 
-        processedVtts.push({
-          start: this.getSecondsFromTimestamp(vttTimeStart),
-          end: this.getSecondsFromTimestamp(vttTimeEnd),
-          css: vttCssDef
-        })
+      processedVtts.push({
+        start: this.getSecondsFromTimestamp(vttTimeStart),
+        end: this.getSecondsFromTimestamp(vttTimeEnd),
+        css: vttCssDef
+      })
 
-      }
-    })
+    }
+  })
     return processedVtts
   }
 
@@ -314,6 +317,13 @@ class vttThumbnailsPlugin {
 
     const cssObj = {}
 
+    if (this.options.sprite) {
+      const imageDefSplit = vttImageDef.split(/#xywh=/i)
+      // const imageUrl = imageDefSplit[0] ignore URL from VTT, use sprite from options
+      const imageCoords = imageDefSplit[1]
+      vttImageDef = this.options.sprite + "#xywh=" + imageCoords;
+    }
+
     // If there isn't a protocol, use the VTT source URL.
     let baseSplit
     if (this.options.src.indexOf('//') >= 0) {
@@ -323,6 +333,7 @@ class vttThumbnailsPlugin {
     }
 
     vttImageDef = this.getFullyQualifiedUrl(vttImageDef, baseSplit)
+
 
     if (!vttImageDef.match(/#xywh=/i)) {
       cssObj.background = 'url("' + vttImageDef + '")'
